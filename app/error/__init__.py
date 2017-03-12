@@ -1,2 +1,2 @@
-from JSONValidationError import JSONValidationError
+from ValidationError import ValidationError
 from NonExistingIndexError import NonExistingIndexError

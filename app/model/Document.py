@@ -1,12 +1,12 @@
 from datetime import datetime
-from elasticsearch_dsl import DocType, Text, Date
+from elasticsearch_dsl import DocType, String, Date
 
 
 class Document(DocType):
 
-    title = Text()
-    contents = Text()
-    url = Text()
+    title = String()
+    contents = String()
+    url = String()
     created_at = Date()
 
     def __init__(self, _index, _document_id, **kwargs):

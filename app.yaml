@@ -1,0 +1,23 @@
+runtime: python
+env: flex
+entrypoint: gunicorn -c gunicorn.config.py -b :$PORT app.index:app
+service: api
+
+skip_files:
+  - .venv
+
+#network:
+#  name: elasticsearch
+#  forwarded_ports:
+#    - 80/tcp
+
+resources:
+  cpu: 2
+  memory_gb: 8
+
+automatic_scaling:
+  min_num_instances: 1
+  max_num_instances: 4
+
+env_variables:
+  ELASTICSEARCH_HOSTS: '104.196.55.54'
