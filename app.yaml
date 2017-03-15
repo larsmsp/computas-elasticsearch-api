@@ -1,7 +1,7 @@
 runtime: python
 env: flex
 entrypoint: gunicorn -c gunicorn.config.py -b :$PORT app.index:app
-service: api
+service: abakus-api
 
 skip_files:
   - .venv

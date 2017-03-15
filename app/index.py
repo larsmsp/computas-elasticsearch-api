@@ -4,11 +4,12 @@ import uuid
 
 from elasticsearch_dsl.connections import connections
 from error import RequestError
-from flask import Flask, request
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 from model import DataStore
 from model import DocumentIndex
 from model.Document import make_document
+from model import Results
 from werkzeug.exceptions import BadRequest
 
 ES_HOSTS_ENV = 'ELASTICSEARCH_HOSTS'
@@ -23,7 +24,7 @@ def root():
     return 'Hello! Nothing to see here. :)'
 
 
-@app.route('/index/register', methods=['POST'])
+@app.route('/register', methods=['POST'])
 def register():
     logging.info("Incoming registration: %s" % request.form)
     __validate_register('name', 'email', 'repository_url')
@@ -37,42 +38,67 @@ def register():
     raise RequestError('User %s exists!' % form_data['name'], 409)
 
 
-@app.route('/index/put/<uuid:index_name>', methods=['POST'])
+@app.route('/<uuid:index_name>/put', methods=['POST'])
 def index_document(index_name):
     __validate_index_payload('id', 'title', 'contents', 'url')
-    document_json = request.get_json()
+    data = request.get_json()
     if DocumentIndex.exists(index_name):
-        document = make_document(index_name,
-                                 document_json['document']['id'],
-                                 document_json['document']['title'],
-                                 document_json['document']['contents'],
-                                 document_json['document']['url'])
-        document.save()
+        documents = [make_document(index_name, d['id'], d['title'], d['contents'], d['url']) for d in data]
+        indexed_documents = DocumentIndex.index(index_name, documents)
+        return jsonify({'indexed_documents': indexed_documents}), 200
+    else:
+        raise __index_not_found(index_name)
+
+
+@app.route('/<uuid:index_name>/search', methods=['POST'])
+def search(index_name):
+    __validate_search_request()
+    query = request.get_json()['query']
+    str_index_name = str(index_name)
+    logging.info('Searching for %s in %s' % (query, str_index_name))
+    if DocumentIndex.exists(str_index_name):
+        response = DocumentIndex.search(str_index_name, query)
+        return jsonify(Results.get_results(response)), 200
+    else:
+        raise __index_not_found(index_name)
+
+
+@app.route('/<uuid:index_name>/clear', methods=['POST'])
+def delete(index_name):
+    str_index_name = str(index_name)
+    if DocumentIndex.exists(str_index_name):
+        DocumentIndex.clear(str_index_name)
         return '', 200
-    else:
-        raise __index_not_found(index_name)
-
-
-@app.route('/search/<uuid:index_name>/<query>', methods=['GET'])
-def search(index_name, query):
-    logging.info('Searching for %s in %s' % (query, index_name))
-    if DocumentIndex.exists(index_name):
-        return DocumentIndex.search(index_name, query)
-    else:
-        raise __index_not_found(index_name)
+    raise __index_not_found(str_index_name)
 
 
 @app.errorhandler(RequestError)
 def handle_error(error):
     logging.exception(error.message)
-    return error.message, error.status_code
+    return jsonify(error=error.status_code, description=error.message), error.status_code
 
 
 def __validate_index_payload(*required_keys):
     if request.is_json:
         try:
+            data = request.get_json()
+            if not type(data) is list:
+                raise __error_in_json()
+            for document in data:
+                for key in required_keys:
+                    if key not in document or not document[key]:
+                        raise RequestError('Missing required field in request: %s' % key, 400)
+        except BadRequest:
+            raise __error_in_json()
+    else:
+        raise __error_in_json()
+
+
+def __validate_search_request():
+    if request.is_json:
+        try:
             json_data = request.get_json()
-            if not ('document' in json_data and all(key in json_data['document'] for key in required_keys)):
+            if 'query' not in json_data or not json_data['query']:
                 raise RequestError(request.data)
         except BadRequest:
             raise __error_in_json()
@@ -81,7 +107,7 @@ def __validate_index_payload(*required_keys):
 
 
 def __error_in_json():
-    return RequestError('There was an error parsing your JSON:\n%s' % request.data)
+    return RequestError('There was an error parsing your JSON: %s' % request.data)
 
 
 def __index_not_found(index_name):
@@ -89,8 +115,9 @@ def __index_not_found(index_name):
 
 
 def __validate_register(*required_fields):
-    if not all(key in request.form for key in required_fields):
-        raise RequestError('Missing fields in form data. Need: %s. Found: %s' % (str(required_fields), str(request.form.keys)))
+    for key in required_fields:
+        if key not in request.form or not request.form[key]:
+            raise RequestError('Missing field %s in form data.' % key, 400)
 
 
 if __name__ == '__main__':

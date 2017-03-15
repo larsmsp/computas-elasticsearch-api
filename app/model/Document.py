@@ -11,10 +11,7 @@ class Document(DocType):
 
     def __init__(self, _index, _document_id, **kwargs):
         super(Document, self).__init__(meta={'id': _document_id, 'index': _index}, **kwargs)
-
-    def save(self, **kwargs):
         self.created_at = datetime.now()
-        return super(Document, self).save(**kwargs)
 
 
 def make_document(index, document_id, title, contents, url):
