@@ -1,10 +1,11 @@
 import logging
 import os
+import urllib2
 import uuid
 
 from elasticsearch_dsl.connections import connections
 from error import RequestError
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS
 from model import DataStore
 from model import DocumentIndex
@@ -12,8 +13,20 @@ from model.Document import make_document
 from model import Results
 from werkzeug.exceptions import BadRequest
 
+logging.basicConfig(format='[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+logging.getLogger().setLevel(logging.INFO)
+
 ES_HOSTS_ENV = 'ELASTICSEARCH_HOSTS'
 es_hosts = ['10.0.0.10'] if ES_HOSTS_ENV not in os.environ else str(os.environ[ES_HOSTS_ENV]).split(',')
+
+try:
+    logging.info("Verifying connection to Elasticsearch hosts...")
+    for h in es_hosts:
+        urllib2.urlopen('http://%s' % h, timeout=1)
+    logging.info("All good!")
+except urllib2.URLError as err:
+    raise RuntimeError('Unable to to connect to Elasticsearch host %s' % h)
+
 connections.create_connection(hosts=es_hosts)
 app = Flask(__name__)
 CORS(app)
@@ -21,7 +34,10 @@ CORS(app)
 
 @app.route('/')
 def root():
-    return 'Hello! Nothing to see here. :)'
+    if 'API_DOC_LOCATION' not in os.environ:
+        return 'Hello! Nothing to see here.:)'
+    else:
+        return redirect(os.environ['API_DOC_LOCATION'], 302)
 
 
 @app.route('/register', methods=['POST'])
@@ -63,8 +79,13 @@ def search(index_name):
         raise __index_not_found(index_name)
 
 
+@app.route('/public/search', methods=['POST'])
+def search_public():
+    return search('public')
+
+
 @app.route('/<uuid:index_name>/clear', methods=['POST'])
-def delete(index_name):
+def clear(index_name):
     str_index_name = str(index_name)
     if DocumentIndex.exists(str_index_name):
         DocumentIndex.clear(str_index_name)

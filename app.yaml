@@ -20,4 +20,5 @@ automatic_scaling:
   max_num_instances: 4
 
 env_variables:
-  ELASTICSEARCH_HOSTS: '104.196.55.54'
+  ELASTICSEARCH_HOSTS: '10.142.0.7:9200,10.142.0.8:9200'
+  API_DOC_LOCATION: 'https://sinuous-tine-156112.appspot.com/api'

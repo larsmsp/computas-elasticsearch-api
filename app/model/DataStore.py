@@ -16,6 +16,7 @@ def create(name, email, index, repository_url):
     entrant.update({
         'name': name,
         'email': email,
+        'index': str(index),
         'repository_url': repository_url
     })
     ds.put(entrant)

@@ -8,8 +8,8 @@ from .Document import Document
 def create(name, analyzer_name='norwegian'):
     index = Index(name)
     index.settings(
-        number_of_shards=1,
-        number_of_replicas=0
+        number_of_shards=2,
+        number_of_replicas=1
     )
     index.doc_type(Document)
     index.analyzer(analyzer(analyzer_name))
